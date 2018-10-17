@@ -85,6 +85,7 @@ private:
     int cloudNeighborPicked[N_SCAN*Horizon_SCAN];
     int cloudLabel[N_SCAN*Horizon_SCAN];
 
+    //imu相关信息，从变量数量上看，对Imu的依赖还是比较强，换句话说，Imu用不好，效果会变得很差
     int imuPointerFront;
     int imuPointerLast;
     int imuPointerLastIteration;
@@ -165,6 +166,7 @@ private:
     pcl::PointCloud<PointType>::Ptr laserCloudOri;
     pcl::PointCloud<PointType>::Ptr coeffSel;
 
+    //匹配时少不了的KD数
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerLast;
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfLast;
 
@@ -189,6 +191,7 @@ public:
         nh("~")
         {
 
+        //点云分割后发送分割的结果，以及上一帧，不然和谁匹配呢
         subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/segmented_cloud", 1, &FeatureAssociation::laserCloudHandler, this);
         subLaserCloudInfo = nh.subscribe<cloud_msgs::cloud_info>("/segmented_cloud_info", 1, &FeatureAssociation::laserCloudInfoHandler, this);
         subOutlierCloud = nh.subscribe<sensor_msgs::PointCloud2>("/outlier_cloud", 1, &FeatureAssociation::outlierCloudHandler, this);
@@ -490,6 +493,7 @@ public:
             point.y = segmentedCloud->points[i].z;
             point.z = segmentedCloud->points[i].x;
 
+            //做一个区间判断，不过暂时还没找到startOrientation和endOrientation赋值的地方
             float ori = -atan2(point.x, point.z);
             if (!halfPassed) {
                 if (ori < segInfo.startOrientation - M_PI / 2)
@@ -804,46 +808,6 @@ public:
 	        pubSurfPointsLessFlat.publish(laserCloudOutMsg);
 	    }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     void TransformToStart(PointType const * const pi, PointType * const po)
