@@ -40,6 +40,7 @@ private:
 
 	ros::NodeHandle nh;
 
+    //发布与订阅节点
     ros::Subscriber subLaserCloud;
     ros::Subscriber subLaserCloudInfo;
     ros::Subscriber subOutlierCloud;
@@ -50,6 +51,7 @@ private:
     ros::Publisher pubSurfPointsFlat;
     ros::Publisher pubSurfPointsLessFlat;
 
+    //特征提取点云
     pcl::PointCloud<PointType>::Ptr segmentedCloud;
     pcl::PointCloud<PointType>::Ptr outlierCloud;
 
