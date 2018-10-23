@@ -123,6 +123,7 @@ public:
         segMsg.segmentedCloudRange.assign(N_SCAN*Horizon_SCAN, 0);
 
         std::pair<int8_t, int8_t> neighbor;
+        //找相邻的点
         neighbor.first = -1; neighbor.second =  0; neighborIterator.push_back(neighbor);
         neighbor.first =  0; neighbor.second =  1; neighborIterator.push_back(neighbor);
         neighbor.first =  0; neighbor.second = -1; neighborIterator.push_back(neighbor);
@@ -161,7 +162,9 @@ public:
     
     void cloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg){
 
+        //把点云转成ros的格式
         copyPointCloud(laserCloudMsg);
+        //找点云的起始点角度和终止点角度
         findStartEndAngle();
         projectPointCloud();
         groundRemoval();
@@ -195,6 +198,10 @@ public:
             thisPoint.z = laserCloudIn->points[i].z;
 
             verticalAngle = atan2(thisPoint.z, sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y)) * 180 / M_PI;
+            //verticalAngle是点相对于水平面的角度
+            //verticalAngle + ang_bottom是相对于点云最下面一根线的角度
+            //ang_res_y应该是线的分辨率，即每隔ang_res_y划分一个区间，这个参数应该是velodyne固有属性
+            //那既然这样ang_res_x是不是也应该是固有属性，如果是，这里的参数是不是应该和雷达设置的转速对应上
             rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
             if (rowIdn < 0 || rowIdn >= N_SCAN)
                 continue;
@@ -209,13 +216,17 @@ public:
                 columnIdn = 1350 - int(horizonAngle / ang_res_x);
 
             range = sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y + thisPoint.z * thisPoint.z);
+            //点云已经按照线数和水平分辨率划分了范围，所有的点都有一个对应的范围，此处是根据范围索引，把距离填进去
             rangeMat.at<float>(rowIdn, columnIdn) = range;
 
+            //这个根本不是强度，只是借用这个变量存储索引信息而已
             thisPoint.intensity = (float)rowIdn + (float)columnIdn / 10000.0;
-
+            
+            //所有的点都存储在一个点云数组中
             index = columnIdn  + rowIdn * Horizon_SCAN;
             fullCloud->points[index] = thisPoint;
 
+            //总之是借用各种变量存储信息，虽然意义和实际对应不上
             fullInfoCloud->points[index].intensity = range;
         }
     }
@@ -226,11 +237,13 @@ public:
         float diffX, diffY, diffZ, angle;
 
         for (size_t j = 0; j < Horizon_SCAN; ++j){
+            //groundScanInd指的是分割地面时所用的线数，从下往上数，因为上面的线是打不到地面上的
             for (size_t i = 0; i < groundScanInd; ++i){
 
                 lowerInd = j + ( i )*Horizon_SCAN;
                 upperInd = j + (i+1)*Horizon_SCAN;
 
+                //intensity里存储的点的距离，无意义时就没必要处理的
                 if (fullCloud->points[lowerInd].intensity == -1 ||
                     fullCloud->points[upperInd].intensity == -1){
                     groundMat.at<int8_t>(i,j) = -1;
@@ -243,13 +256,15 @@ public:
 
                 angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;
 
+                //角度小于一定值则代表是地面？
                 if (abs(angle - sensorMountAngle) <= 10){
                     groundMat.at<int8_t>(i,j) = 1;
                     groundMat.at<int8_t>(i+1,j) = 1;
                 }
             }
         }
-
+        
+        //如果已经把点分配给地面了，就设置标志位，后面再分割时就不用这些点了，因为已经分割过了
         for (size_t i = 0; i < N_SCAN; ++i){
             for (size_t j = 0; j < Horizon_SCAN; ++j){
                 if (groundMat.at<int8_t>(i,j) == 1 || rangeMat.at<float>(i,j) == FLT_MAX){
@@ -257,6 +272,8 @@ public:
                 }
             }
         }
+
+        //地面点云单独存储
         if (pubGroundCloud.getNumSubscribers() != 0){
             for (size_t i = 0; i <= groundScanInd; ++i){
                 for (size_t j = 0; j < Horizon_SCAN; ++j){
@@ -270,6 +287,9 @@ public:
     void cloudSegmentation(){
         for (size_t i = 0; i < N_SCAN; ++i)
             for (size_t j = 0; j < Horizon_SCAN; ++j)
+                //只对非地面点云做此操作
+                //按照一定条件进行聚类分割，每次分割的聚类分配一个labelCount的编号
+                //对于一些特别小的聚类，则舍弃，并把labelMat设置为9999，以与其他有效聚类分别开
                 if (labelMat.at<int>(i,j) == 0)
                     labelComponents(i, j);
 
@@ -281,6 +301,7 @@ public:
             for (size_t j = 0; j < Horizon_SCAN; ++j) {
                 if (labelMat.at<int>(i,j) > 0 || groundMat.at<int8_t>(i,j) == 1){
                     if (labelMat.at<int>(i,j) == 999999){
+                        //满足此条件的是既不属于地面，也不属于聚类的点
                         if (i > groundScanInd && j % 5 == 0){
                             outlierCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
                             continue;
@@ -288,6 +309,7 @@ public:
                             continue;
                         }
                     }
+                    //地面点云稀疏一下
                     if (groundMat.at<int8_t>(i,j) == 1){
                         if (j%5!=0 && j>5 && j<Horizon_SCAN-5)
                             continue;
@@ -315,6 +337,8 @@ public:
         }
     }
 
+    //按照一定条件进行聚类分割，每次分割的聚类分配一个labelCount的编号
+    //对于一些特别小的聚类，则舍弃，并把labelMat设置为9999，以与其他有效聚类分别开
     void labelComponents(int row, int col){
         float d1, d2, alpha, angle;
         int fromIndX, fromIndY, thisIndX, thisIndY; 
@@ -335,6 +359,7 @@ public:
             fromIndY = queueIndY[queueStartInd];
             --queueSize;
             ++queueStartInd;
+            //labelCount初值为1
             labelMat.at<int>(fromIndX, fromIndY) = labelCount;
 
             for (auto iter = neighborIterator.begin(); iter != neighborIterator.end(); ++iter){

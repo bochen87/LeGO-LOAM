@@ -337,6 +337,7 @@ public:
 
     void VeloToStartIMU()
     {
+        //这里的imuVeloXStart指的是一帧当中的第一个点的时间
         imuVeloFromStartXCur = imuVeloXCur - imuVeloXStart;
         imuVeloFromStartYCur = imuVeloYCur - imuVeloYStart;
         imuVeloFromStartZCur = imuVeloZCur - imuVeloZStart;
@@ -406,6 +407,7 @@ public:
         double timeDiff = imuTime[imuPointerLast] - imuTime[imuPointerBack];
         if (timeDiff < scanPeriod) {
 
+            //速度和位置在新的一帧点云到来时都应该清零，不然发散会越来越开，应为它不是线性的
             imuShiftX[imuPointerLast] = imuShiftX[imuPointerBack] + imuVeloX[imuPointerBack] * timeDiff + accX * timeDiff * timeDiff / 2;
             imuShiftY[imuPointerLast] = imuShiftY[imuPointerBack] + imuVeloY[imuPointerBack] * timeDiff + accY * timeDiff * timeDiff / 2;
             imuShiftZ[imuPointerLast] = imuShiftZ[imuPointerBack] + imuVeloZ[imuPointerBack] * timeDiff + accZ * timeDiff * timeDiff / 2;
@@ -458,6 +460,7 @@ public:
         timeNewSegmentedCloud = timeScanCur;
 
         segmentedCloud->clear();
+        //从ros格式转成pcl格式
         pcl::fromROSMsg(*laserCloudMsg, *segmentedCloud);
 
         newSegmentedCloud = true;
@@ -468,6 +471,7 @@ public:
         timeNewOutlierCloud = msgIn->header.stamp.toSec();
 
         outlierCloud->clear();
+        //从ros格式转成pcl格式
         pcl::fromROSMsg(*msgIn, *outlierCloud);
 
         newOutlierCloud = true;
@@ -490,11 +494,12 @@ public:
 
         for (int i = 0; i < cloudSize; i++) {
 
+            //转到右前上坐标系，按照zxy顺序计算旋转矩阵
             point.x = segmentedCloud->points[i].y;
             point.y = segmentedCloud->points[i].z;
             point.z = segmentedCloud->points[i].x;
 
-            //做一个区间判断，不过暂时还没找到startOrientation和endOrientation赋值的地方
+            //做一个区间判断，四象限的判断，话说用了atan2还用得到这种判断吗
             float ori = -atan2(point.x, point.z);
             if (!halfPassed) {
                 if (ori < segInfo.startOrientation - M_PI / 2)
@@ -517,9 +522,11 @@ public:
             float relTime = (ori - segInfo.startOrientation) / segInfo.orientationDiff;
             point.intensity = int(segmentedCloud->points[i].intensity) + scanPeriod * relTime;
 
+            //这个判断条件代表已经有Imu信息，只要来一帧，这个判断条件就能通过，没有值时imuPointerLast=-1
             if (imuPointerLast >= 0) {
                 float pointTime = relTime * scanPeriod;
                 imuPointerFront = imuPointerLastIteration;
+                //找当前最新的一帧Imu数据
                 while (imuPointerFront != imuPointerLast) {
                     if (timeScanCur + pointTime < imuTime[imuPointerFront]) {
                         break;
@@ -540,14 +547,17 @@ public:
                     imuShiftYCur = imuShiftY[imuPointerFront];
                     imuShiftZCur = imuShiftZ[imuPointerFront];   
                 } else {
+                    //找上一帧
                     int imuPointerBack = (imuPointerFront + imuQueLength - 1) % imuQueLength;
                     float ratioFront = (timeScanCur + pointTime - imuTime[imuPointerBack]) 
                                                      / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
                     float ratioBack = (imuTime[imuPointerFront] - timeScanCur - pointTime) 
                                                     / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
 
+                    //根据时间分配权值，求出中间值
                     imuRollCur = imuRoll[imuPointerFront] * ratioFront + imuRoll[imuPointerBack] * ratioBack;
                     imuPitchCur = imuPitch[imuPointerFront] * ratioFront + imuPitch[imuPointerBack] * ratioBack;
+
                     if (imuYaw[imuPointerFront] - imuYaw[imuPointerBack] > M_PI) {
                         imuYawCur = imuYaw[imuPointerFront] * ratioFront + (imuYaw[imuPointerBack] + 2 * M_PI) * ratioBack;
                     } else if (imuYaw[imuPointerFront] - imuYaw[imuPointerBack] < -M_PI) {
@@ -604,6 +614,8 @@ public:
                     updateImuRollPitchYawStartSinCos();
                 } else {
                     VeloToStartIMU();
+                    //转到一帧的起始坐标系上去
+                    //这里去除畸变只去了角度，不应该角度和位置一起去吗
                     TransformToStartIMU(&point);
                 }
             }
@@ -613,6 +625,7 @@ public:
         imuPointerLastIteration = imuPointerLast;
     }
 
+    //平滑
     void calculateSmoothness()
     {
         int cloudSize = segmentedCloud->points.size();
@@ -701,6 +714,7 @@ public:
                         segInfo.segmentedCloudGroundFlag[ind] == false) {
                     
                         largestPickedNum++;
+                        //提取特征，此处的提取只是找具有特征资格的点，具体特征类型和是否属于特征则在后面进行
                         if (largestPickedNum <= 2) {
                             cloudLabel[ind] = 2;
                             cornerPointsSharp->push_back(segmentedCloud->points[ind]);
@@ -1113,6 +1127,7 @@ public:
 
         for (int i = 0; i < surfPointsFlatNum; i++) {
 
+            //pointSel是函数的输出
             TransformToStart(&surfPointsFlat->points[i], &pointSel);
 
             if (iterCount % 5 == 0) {
@@ -1233,6 +1248,7 @@ public:
         cv::Mat matAtB(3, 1, CV_32F, cv::Scalar::all(0));
         cv::Mat matX(3, 1, CV_32F, cv::Scalar::all(0));
 
+        //和R相关的都是旋转，和T相关的都是平移
         float srx = sin(transformCur[0]);
         float crx = cos(transformCur[0]);
         float sry = sin(transformCur[1]);
@@ -1651,6 +1667,9 @@ public:
 
     void integrateTransformation(){
         float rx, ry, rz, tx, ty, tz;
+        //把imu的信息积分得到补偿量补偿进去，这种做法其实并不准确
+        //应该是要看是Imu累计误差大还是帧间匹配累计误差大，不一定用了imu就是好的
+        //换句话说，这种方法对imu精度较高
         AccumulateRotation(transformSum[0], transformSum[1], transformSum[2], 
                            -transformCur[0], -transformCur[1], -transformCur[2], rx, ry, rz);
 
@@ -1658,7 +1677,9 @@ public:
                  - sin(rz) * (transformCur[4] - imuShiftFromStartY);
         float y1 = sin(rz) * (transformCur[3] - imuShiftFromStartX) 
                  + cos(rz) * (transformCur[4] - imuShiftFromStartY);
-        float z1 = transformCur[5] - imuShiftFromStartZ;
+        //为了不让高程积分累计误差，是不是这部分应该去掉
+        //float z1 = transformCur[5] - imuShiftFromStartZ;
+        float z1 = transformCur[5];
 
         float x2 = x1;
         float y2 = cos(rx) * y1 - sin(rx) * z1;
@@ -1771,7 +1792,7 @@ public:
 
     void runFeatureAssociation()
     {
-
+        //虽然写在循环里，但是只有新的点云到来时才往下执行
         if (newSegmentedCloud && newSegmentedCloudInfo && newOutlierCloud &&
             std::abs(timeNewSegmentedCloudInfo - timeNewSegmentedCloud) < 0.05 &&
             std::abs(timeNewOutlierCloud - timeNewSegmentedCloud) < 0.05){
@@ -1785,8 +1806,10 @@ public:
 
         adjustDistortion();
 
+        //计算点云距离
         calculateSmoothness();
 
+        //离群点？
         markOccludedPoints();
 
         extractFeatures();
@@ -1800,12 +1823,14 @@ public:
 
         updateInitialGuess();
 
+        //此处是帧间匹配，没有imu?
         updateTransformation();
 
         integrateTransformation();
 
         publishOdometry();
 
+        //非特征点云
         publishCloudsLast();   
     }
 };
@@ -1826,6 +1851,7 @@ int main(int argc, char** argv)
     {
         ros::spinOnce();
 
+        //虽然写在循环里，但是只有新的点云到来时才往下执行
         FA.runFeatureAssociation();
 
         rate.sleep();
