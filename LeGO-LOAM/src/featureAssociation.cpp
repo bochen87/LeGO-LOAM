@@ -480,6 +480,7 @@ public:
         newSegmentedCloudInfo = true;
     }
 
+    //去除畸变
     void adjustDistortion()
     {
         bool halfPassed = false;
@@ -512,6 +513,7 @@ public:
                     ori -= 2 * M_PI;
             }
 
+            //当前角度减去start角度再除以总角度，得到相对时间，再在后面乘以一帧的时间便是当前点的时间
             float relTime = (ori - segInfo.startOrientation) / segInfo.orientationDiff;
             point.intensity = int(segmentedCloud->points[i].intensity) + scanPeriod * relTime;
 
