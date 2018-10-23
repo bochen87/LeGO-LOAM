@@ -371,6 +371,7 @@ public:
         latestFrameID = 0;
     }
 
+    //当前，
     void transformAssociateToMap()
     {
         float x1 = cos(transformSum[1]) * (transformBefMapped[3] - transformSum[3]) 
@@ -758,6 +759,7 @@ public:
         }
     }
 
+    //用KD树和当前关键帧检测闭环，可以扩展一下，用gps做参考检测闭环
     bool detectLoopClosure(){
 
         latestSurfKeyFrameCloud->clear();
@@ -774,6 +776,7 @@ public:
         closestHistoryFrameID = -1;
         for (int i = 0; i < pointSearchIndLoop.size(); ++i){
             int id = pointSearchIndLoop[i];
+            //时间要大于30S
             if (abs(cloudKeyPoses6D->points[id].time - timeLaserOdometry) > 30.0){
                 closestHistoryFrameID = id;
                 break;
@@ -876,6 +879,7 @@ public:
         Vector6 << noiseScore, noiseScore, noiseScore, noiseScore, noiseScore, noiseScore;
         constraintNoise = noiseModel::Diagonal::Variances(Vector6);
 
+        //把闭环生成的点和边加入因子图进行图优化
         std::lock_guard<std::mutex> lock(mtx);
         gtSAMgraph.add(BetweenFactor<Pose3>(latestFrameIDLoopCloure, closestHistoryFrameID, poseFrom.between(poseTo), constraintNoise));
         isam->update(gtSAMgraph);
