@@ -24,6 +24,8 @@ find_package(GTSAM REQUIRED QUIET)
 find_package(PCL REQUIRED QUIET)
 find_package(OpenCV REQUIRED QUIET)
 
+add_service_files(FILES save_map.srv)
+
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS cloud_msgs

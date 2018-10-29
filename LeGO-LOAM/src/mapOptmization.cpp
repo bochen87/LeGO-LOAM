@@ -43,6 +43,7 @@
 #include <gtsam/nonlinear/Values.h>
 
 #include <gtsam/nonlinear/ISAM2.h>
+#include "lego_loam/save_map.h"
 
 using namespace gtsam;
 
@@ -1455,6 +1456,55 @@ public:
     }
 };
 
+bool save_map_callback(chapter2_tutorials::chapter2_srv1::Request  &req,
+                        chapter2_tutorials::chapter2_srv1::Response &res)
+{
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    pcl::PointXYZ p;
+
+    std::vector<int> pointSearchIndGlobalMap;
+    std::vector<float> pointSearchSqDisGlobalMap;
+
+    mtx.lock();
+    kdtreeGlobalMap->setInputCloud(cloudKeyPoses3D);
+    kdtreeGlobalMap->radiusSearch(currentRobotPosPoint, 10000.0, pointSearchIndGlobalMap, pointSearchSqDisGlobalMap, 0);
+    mtx.unlock();
+
+    for (int i = 0; i < pointSearchIndGlobalMap.size(); ++i)
+        globalMapKeyPoses->points.push_back(cloudKeyPoses3D->points[pointSearchIndGlobalMap[i]]);
+
+    downSizeFilterGlobalMapKeyPoses.setInputCloud(globalMapKeyPoses);
+    downSizeFilterGlobalMapKeyPoses.filter(*globalMapKeyPosesDS);
+
+    for (int i = 0; i < globalMapKeyPosesDS->points.size(); ++i){
+        int thisKeyInd = (int)globalMapKeyPosesDS->points[i].intensity;
+        *globalMapKeyFrames += *transformPointCloud(cornerCloudKeyFrames[thisKeyInd],   &cloudKeyPoses6D->points[thisKeyInd]);
+        *globalMapKeyFrames += *transformPointCloud(surfCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
+        *globalMapKeyFrames += *transformPointCloud(outlierCloudKeyFrames[thisKeyInd], &cloudKeyPoses6D->points[thisKeyInd]);
+    }
+
+    downSizeFilterGlobalMapKeyFrames.setInputCloud(globalMapKeyFrames);
+    downSizeFilterGlobalMapKeyFrames.filter(*globalMapKeyFramesDS);
+
+    globalMapKeyPoses->clear();
+    globalMapKeyPosesDS->clear();
+    globalMapKeyFrames->clear();
+    globalMapKeyFramesDS->clear();
+
+  for (int i = 0; i < globalMapKeyPosesDS->points.size(); ++i){
+        p.x = globalMapKeyPosesDS->points[i].x;
+        p.y = globalMapKeyPosesDS->points[i].y;
+        p.z = globalMapKeyPosesDS->points[i].z;
+        cloud.points.push_back(p);
+    }
+
+  // save pcd
+  cloud.header.frame_id = "/map";
+  cloud.width = cloud.points.size();
+  cloud.height = 1;
+  pcl::io::savePCDFileASCII(req, cloud);
+  return true;
+}
 
 int main(int argc, char** argv)
 {
@@ -1466,6 +1516,19 @@ int main(int argc, char** argv)
 
     std::thread loopthread(&mapOptimization::loopClosureThread, &MO);
     std::thread visualizeMapThread(&mapOptimization::visualizeGlobalMapThread, &MO);
+
+    ros::ServiceServer service = n.advertiseService("save_map", save_map_callback);
+
+    ros::ServiceClient client = n.serviceClient<lego_loam::save_map>("save_map");
+    lego_loam::save_map srv;
+    if (client.call(srv))
+    {
+        ROS_INFO("map saved succeed");
+    }
+    else
+    {
+        ROS_ERROR("Failed to save map");
+    }
 
     ros::Rate rate(200);
     while (ros::ok())
