@@ -50,15 +50,24 @@ using namespace std;
 
 typedef pcl::PointXYZI  PointType;
 
-extern const int N_SCAN = 16;//雷达线数
-extern const int Horizon_SCAN = 1800;//1800个点对应0.2的角分辨率，但是转速不一样这里的分辨率也不一样，怎么对应
+/* velodyne */
+extern const int N_SCAN = 16;
+extern const int Horizon_SCAN = 1800;
 extern const float ang_res_x = 0.2;
 extern const float ang_res_y = 2.0;
 extern const float ang_bottom = 15.0+0.1;
 extern const int groundScanInd = 7;
-
-extern const bool loopClosureEnableFlag = false;
-extern const double mappingProcessInterval = 0.3;
+ 
+/* ls
+extern const int N_SCAN = 16;
+extern const int Horizon_SCAN = 2000;
+extern const float ang_res_x = 0.18;
+extern const float ang_res_y = 2.0;
+extern const float ang_bottom = 15.0+0.1;
+extern const int groundScanInd = 2;
+*/
+extern const bool loopClosureEnableFlag = true;
+extern const double mappingProcessInterval = 0.3;//原始值0.3
 
 extern const float scanPeriod = 0.1;
 extern const int systemDelay = 0;
@@ -81,14 +90,14 @@ extern const float edgeThreshold = 0.1;
 extern const float surfThreshold = 0.1;
 extern const float nearestFeatureSearchSqDist = 25;
 
-extern const float surroundingKeyframeSearchRadius = 50.0;
-extern const int   surroundingKeyframeSearchNum = 50;
+extern const float surroundingKeyframeSearchRadius = 50.0;//原始值50.0
+extern const int   surroundingKeyframeSearchNum = 50;//原始值50
 
-extern const float historyKeyframeSearchRadius = 5.0;
-extern const int   historyKeyframeSearchNum = 25;
-extern const float historyKeyframeFitnessScore = 0.3;
+extern const float historyKeyframeSearchRadius = 30.0;//原始值5.0
+extern const int   historyKeyframeSearchNum = 150;//原始值25
+extern const float historyKeyframeFitnessScore = 0.6;//原始值0.3
 
-extern const float globalMapVisualizationSearchRadius = 50.0;
+extern const float globalMapVisualizationSearchRadius = 1500.0;//原始值50
 
 
 struct smoothness_t{ 

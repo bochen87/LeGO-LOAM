@@ -377,9 +377,13 @@ public:
         float y5 = cosImuPitchStart * y4 + sinImuPitchStart * z4;
         float z5 = -sinImuPitchStart * y4 + cosImuPitchStart * z4;
 
-        p->x = cosImuRollStart * x5 + sinImuRollStart * y5 + imuShiftFromStartXCur;
+        /*p->x = cosImuRollStart * x5 + sinImuRollStart * y5 + imuShiftFromStartXCur;
         p->y = -sinImuRollStart * x5 + cosImuRollStart * y5 + imuShiftFromStartYCur;
-        p->z = z5 + imuShiftFromStartZCur;
+        p->z = z5 + imuShiftFromStartZCur;*/
+
+        p->x = cosImuRollStart * x5 + sinImuRollStart * y5;
+        p->y = -sinImuRollStart * x5 + cosImuRollStart * y5 ;
+        p->z = z5;
     }
 
     void AccumulateIMUShiftAndRotation()
@@ -432,6 +436,10 @@ public:
         float accX = imuIn->linear_acceleration.y - sin(roll) * cos(pitch) * 9.81;
         float accY = imuIn->linear_acceleration.z - cos(roll) * cos(pitch) * 9.81;
         float accZ = imuIn->linear_acceleration.x + sin(pitch) * 9.81;
+
+        accX = 0.0;
+        accY = 0.0;
+        accZ = 0.0;
 
         imuPointerLast = (imuPointerLast + 1) % imuQueLength;
 
@@ -893,11 +901,16 @@ public:
         float y6 = sin(rz) * x5 + cos(rz) * y5 + ty;
         float z6 = z5 + tz;
 
-        float x7 = cosImuRollStart * (x6 - imuShiftFromStartX) 
+        /*float x7 = cosImuRollStart * (x6 - imuShiftFromStartX) 
                  - sinImuRollStart * (y6 - imuShiftFromStartY);
         float y7 = sinImuRollStart * (x6 - imuShiftFromStartX) 
                  + cosImuRollStart * (y6 - imuShiftFromStartY);
-        float z7 = z6 - imuShiftFromStartZ;
+        float z7 = z6 - imuShiftFromStartZ;*/
+        float x7 = cosImuRollStart * (x6) 
+                 - sinImuRollStart * (y6);
+        float y7 = sinImuRollStart * (x6) 
+                 + cosImuRollStart * (y6);
+        float z7 = z6;
 
         float x8 = x7;
         float y8 = cosImuPitchStart * y7 - sinImuPitchStart * z7;
@@ -1673,10 +1686,14 @@ public:
         AccumulateRotation(transformSum[0], transformSum[1], transformSum[2], 
                            -transformCur[0], -transformCur[1], -transformCur[2], rx, ry, rz);
 
-        float x1 = cos(rz) * (transformCur[3] - imuShiftFromStartX) 
+        /*float x1 = cos(rz) * (transformCur[3] - imuShiftFromStartX) 
                  - sin(rz) * (transformCur[4] - imuShiftFromStartY);
         float y1 = sin(rz) * (transformCur[3] - imuShiftFromStartX) 
-                 + cos(rz) * (transformCur[4] - imuShiftFromStartY);
+                 + cos(rz) * (transformCur[4] - imuShiftFromStartY);*/
+        float x1 = cos(rz) * (transformCur[3]) 
+                 - sin(rz) * (transformCur[4]);
+        float y1 = sin(rz) * (transformCur[3] ) 
+                 + cos(rz) * (transformCur[4] );
         //为了不让高程积分累计误差，是不是这部分应该去掉
         //float z1 = transformCur[5] - imuShiftFromStartZ;
         float z1 = transformCur[5];
