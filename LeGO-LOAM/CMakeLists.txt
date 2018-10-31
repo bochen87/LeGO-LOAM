@@ -18,17 +18,17 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   nav_msgs
   cloud_msgs
+  cloud_srv1
 )
 
 find_package(GTSAM REQUIRED QUIET)
 find_package(PCL REQUIRED QUIET)
 find_package(OpenCV REQUIRED QUIET)
 
-add_service_files(FILES save_map.srv)
-
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS cloud_msgs
+  CATKIN_DEPENDS cloud_srv1
   DEPENDS PCL
 )
 
@@ -56,6 +56,7 @@ add_dependencies(featureAssociation ${catkin_EXPORTED_TARGETS} cloud_msgs_gencpp
 target_link_libraries(featureAssociation ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(mapOptmization src/mapOptmization.cpp)
+add_dependencies(mapOptmization ${catkin_EXPORTED_TARGETS} cloud_srv1_gencpp)
 target_link_libraries(mapOptmization ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} gtsam)
 
 add_executable(transformFusion src/transformFusion.cpp)
